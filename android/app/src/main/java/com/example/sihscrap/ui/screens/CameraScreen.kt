@@ -527,9 +527,12 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16
                             scope.launch {
                                 isAllocatingTier = true
-                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16)
+                                val success = vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16)
                                 memoryStats = vlmEngine.getMemoryStats()
                                 isAllocatingTier = false
+                                if (!success && vlmEngine.discoveredModelFile == null) {
+                                    showHardwareDialog = true
+                                }
                             }
                         },
                         color = if (is7B) Color(0xFFFF6D00) else Color.White.copy(alpha = 0.15f),
@@ -543,6 +546,26 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             fontWeight = if (is7B) FontWeight.ExtraBold else FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         )
+                    }
+
+                    // Direct Download button when no weights are detected
+                    if (vlmEngine.discoveredModelFile == null) {
+                        Surface(
+                            onClick = {
+                                memoryStats = vlmEngine.getMemoryStats()
+                                showHardwareDialog = true
+                            },
+                            color = Color(0xFF0284C7),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = "📥 Download",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                            )
+                        }
                     }
 
                     // Hardware Settings modal launcher
@@ -903,13 +926,24 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                     }
                 },
                 dismissButton = {
-                    OutlinedButton(
-                        onClick = {
-                            backendError = null
-                            isShutterLocked = false
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                backendError = null
+                                showHardwareDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
+                        ) {
+                            Text("📥 Model Hub")
                         }
-                    ) {
-                        Text("Dismiss")
+                        OutlinedButton(
+                            onClick = {
+                                backendError = null
+                                isShutterLocked = false
+                            }
+                        ) {
+                            Text("Dismiss")
+                        }
                     }
                 }
             )
@@ -962,39 +996,43 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                     Text("📁 Model Storage Path:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Text("/sdcard/Download/ or /sdcard/models/", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text("Supports: .gguf (Qwen2.5-VL), .onnx, .ort", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            Button(
-                                                onClick = {
-                                                    vlmEngine.downloadModelWeights()
-                                                },
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.weight(1f)
-                                            ) {
-                                                Text("📥 Download 7B (4.8GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                            Button(
-                                                onClick = {
-                                                    vlmEngine.downloadLightweightVisionModel()
-                                                },
-                                                shape = RoundedCornerShape(8.dp),
-                                                modifier = Modifier.weight(1f),
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
-                                            ) {
-                                                Text("⚡ Download 2B (1.5GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                        OutlinedButton(
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("⚡ Direct 1-Tap GGUF Downloads:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                Text("Downloads directly to /sdcard/Download/ with background progress notification.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
                                             onClick = {
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF"))
-                                                context.startActivity(intent)
+                                                vlmEngine.downloadModelWeights()
                                             },
                                             shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.weight(1f)
                                         ) {
-                                            Text("🌐 View Qwen2.5-VL on HuggingFace", fontSize = 10.sp)
+                                            Text("📥 Download 7B (4.68 GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         }
+                                        Button(
+                                            onClick = {
+                                                vlmEngine.downloadLightweightVisionModel()
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
+                                        ) {
+                                            Text("⚡ Download 2B (986 MB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF"))
+                                            context.startActivity(intent)
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("🌐 View Qwen2.5-VL on HuggingFace", fontSize = 10.sp)
                                     }
                                 }
                             }

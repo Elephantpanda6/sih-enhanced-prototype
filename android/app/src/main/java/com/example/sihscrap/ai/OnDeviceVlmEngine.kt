@@ -64,6 +64,8 @@ class OnDeviceVlmEngine(private val context: Context) {
     fun scanForModelFiles(): File? {
         val searchDirs = listOfNotNull(
             context.getExternalFilesDir("models"),
+            context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
             File(Environment.getExternalStorageDirectory(), "Download"),
             File(Environment.getExternalStorageDirectory(), "models"),
             context.filesDir
@@ -74,8 +76,10 @@ class OnDeviceVlmEngine(private val context: Context) {
                 if (dir.exists() && dir.isDirectory) {
                     val files = dir.listFiles { file ->
                         val name = file.name.lowercase()
-                        (name.endsWith(".gguf") || name.endsWith(".onnx") || name.endsWith(".bin") || name.endsWith(".ort")) &&
-                        (name.contains("7b") || name.contains("qwen") || name.contains("vlm") || name.contains("2b"))
+                        val isCandidate = (name.endsWith(".gguf") || name.endsWith(".onnx") || name.endsWith(".bin") || name.endsWith(".ort")) &&
+                            (name.contains("7b") || name.contains("qwen") || name.contains("vlm") || name.contains("2b"))
+                        // Require at least 50 MB to prevent treating 0-byte or failed-download stubs as complete weights
+                        isCandidate && file.length() > 50 * 1024 * 1024
                     }
                     if (!files.isNullOrEmpty()) {
                         discoveredModelFile = files.first()
@@ -97,34 +101,46 @@ class OnDeviceVlmEngine(private val context: Context) {
      * Android DownloadManager handles download resumption and system notifications.
      */
     fun downloadModelWeights(
-        url: String = "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/qwen2.5-vl-7b-instruct-q4_k_m.gguf",
-        fileName: String = "qwen2.5-vl-7b-instruct-q4_k_m.gguf"
+        url: String = "https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
+        fileName: String = "Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf"
     ): Long {
         return try {
+            // Delete any existing 0-byte or corrupted stub from previous failed downloads
+            val targetFile = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), fileName)
+            if (targetFile.exists() && targetFile.length() < 50 * 1024 * 1024) {
+                targetFile.delete()
+            }
+
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
             val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
                 .setTitle("Qwen2.5-VL-7B Weights")
-                .setDescription("Downloading 7B Vision Model for RedMagic 11 Pro")
+                .setDescription("Downloading 7B Vision Model for RedMagic 11 Pro ($fileName)")
                 .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
             statusMessage = "Downloading $fileName via Android DownloadManager..."
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, "Started download of $fileName. Check notifications bar for progress.", android.widget.Toast.LENGTH_LONG).show()
+            }
             downloadManager.enqueue(request)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to enqueue download: ${e.message}", e)
             statusMessage = "Download failed: ${e.message}"
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                android.widget.Toast.makeText(context, "Download failed: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
             -1L
         }
     }
 
     /**
-     * Optional lightweight 2B vision model download (1.5 GB) for faster testing.
+     * Optional lightweight 2B vision model download (986 MB) for rapid testing.
      */
     fun downloadLightweightVisionModel(): Long {
         return downloadModelWeights(
-            url = "https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct-GGUF/resolve/main/qwen2-vl-2b-instruct-q4_k_m.gguf",
-            fileName = "qwen2-vl-2b-instruct-q4_k_m.gguf"
+            url = "https://huggingface.co/bartowski/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+            fileName = "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"
         )
     }
 
