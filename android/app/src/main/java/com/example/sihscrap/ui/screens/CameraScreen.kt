@@ -103,17 +103,17 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
         scope.launch {
             try {
                 val currentBmp = previewViewRef?.bitmap ?: Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888)
-                val stream = java.io.ByteArrayOutputStream()
-                currentBmp.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                val realImageBytes = stream.toByteArray()
-                val reqFile = RequestBody.create(MediaType.parse("image/jpeg"), realImageBytes)
-                val body = MultipartBody.Part.createFormData("file", "${currentResult.categoryCode}.jpg", reqFile)
-                val response = RetrofitClient.instance.analyzeMultimodal(body)
-                multimodalReport = response
+                // 100% On-Device Standalone Multimodal & CPCB Compliance Audit (Zero Localhost Dependency)
+                val report = com.example.sihscrap.ai.OnDeviceMultimodalAuditor.auditItemLocally(
+                    bitmap = currentBmp,
+                    categoryCode = currentResult.categoryCode,
+                    categoryName = currentResult.categoryName,
+                    rustPercentage = currentResult.rustPercentage
+                )
+                multimodalReport = report
                 backendError = null
             } catch (e: Exception) {
-                multimodalReport = null
-                backendError = "🔴 Backend VLM Server Unreachable (${e.javaClass.simpleName}):\n${e.localizedMessage ?: e.message}\n\nEndpoint: ${RetrofitClient.getBaseUrl()}/api/v1/vision/analyze-multimodal\n\nEnsure backend server is running on host laptop and mobile device is on the same local network."
+                backendError = "On-Device Multimodal Audit Error: ${e.message}"
             } finally {
                 isAnalyzingMultimodal = false
             }
@@ -406,16 +406,15 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             }
 
             Surface(
-                onClick = { showIpDialog = true },
-                color = Color.Black.copy(alpha = 0.70f),
+                color = Color(0xFF0D47A1).copy(alpha = 0.85f),
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.4f))
+                border = BorderStroke(1.dp, Color(0xFF42A5F5))
             ) {
                 Text(
-                    text = "🌐 Host: ${RetrofitClient.getBaseUrl().replace("http://", "")}",
+                    text = "📱 100% On-Device Standalone",
                     color = Color.White,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     maxLines = 1
                 )
@@ -526,7 +525,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             if (isAnalyzingMultimodal) {
                                 CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Auditing with 7B VLM...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Auditing on Snapdragon 8 Elite...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             } else {
                                 Icon(Icons.Default.Camera, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
