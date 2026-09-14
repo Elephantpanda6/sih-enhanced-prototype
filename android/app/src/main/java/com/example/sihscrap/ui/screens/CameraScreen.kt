@@ -80,16 +80,18 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
         )
     }
 
-    var backendError by remember { mutableStateOf<String?>(null) }
-    var customBackendIp by remember { mutableStateOf(RetrofitClient.getBaseUrl()) }
-    var showIpDialog by remember { mutableStateOf(false) }
+    val vlmEngine = remember { com.example.sihscrap.ai.OnDeviceVlmEngine(context) }
+    var memoryStats by remember { mutableStateOf(vlmEngine.getMemoryStats()) }
+    var selectedTier by remember { mutableStateOf(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16) }
+    var showHardwareDialog by remember { mutableStateOf(false) }
+    var isAllocatingTier by remember { mutableStateOf(false) }
 
+    var backendError by remember { mutableStateOf<String?>(null) }
     var isShutterLocked by remember { mutableStateOf(false) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val scope = rememberCoroutineScope()
     var multimodalReport by remember { mutableStateOf<MultimodalAnalysisResponse?>(null) }
     var isAnalyzingMultimodal by remember { mutableStateOf(false) }
-
 
     val cameraOptions = remember { mutableStateListOf<CameraDeviceInfo>() }
     var selectedCameraOption by remember { mutableStateOf<CameraDeviceInfo?>(null) }
@@ -97,14 +99,21 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        isAllocatingTier = true
+        vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16)
+        memoryStats = vlmEngine.getMemoryStats()
+        isAllocatingTier = false
+    }
+
     val triggerBatchAudit: () -> Unit = {
         isShutterLocked = true
         isAnalyzingMultimodal = true
         scope.launch {
             try {
                 val currentBmp = previewViewRef?.bitmap ?: Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888)
-                // 100% On-Device Standalone Multimodal & CPCB Compliance Audit (Zero Localhost Dependency)
-                val report = com.example.sihscrap.ai.OnDeviceMultimodalAuditor.auditItemLocally(
+                // 100% On-Device Standalone Multimodal & CPCB Compliance Audit (Snapdragon 8 Elite)
+                val report = vlmEngine.auditFrame(
                     bitmap = currentBmp,
                     categoryCode = currentResult.categoryCode,
                     categoryName = currentResult.categoryName,
@@ -123,6 +132,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
     DisposableEffect(Unit) {
         onDispose {
             classifier.close()
+            vlmEngine.releaseRam()
             cameraExecutor.shutdown()
         }
     }
@@ -382,7 +392,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             }
         }
 
-        // AI Engine Status & Host IP Pill Banner
+        // AI Engine Status & On-Device Hardware Pill Banner
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -406,18 +416,27 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             }
 
             Surface(
+                onClick = {
+                    memoryStats = vlmEngine.getMemoryStats()
+                    showHardwareDialog = true
+                },
                 color = Color(0xFF0D47A1).copy(alpha = 0.85f),
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.dp, Color(0xFF42A5F5))
             ) {
-                Text(
-                    text = "📱 100% On-Device Standalone",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    maxLines = 1
-                )
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val ramGb = vlmEngine.allocatedRamBytes / (1024.0 * 1024.0 * 1024.0)
+                    Text(
+                        text = if (isAllocatingTier) "⏳ Allocating RAM..." else "🧠 ${String.format("%.1f", ramGb)} GB VLM RAM ⚙️",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
             }
         }
 
@@ -704,7 +723,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             )
         }
 
-        // Explicit Backend Connection / VLM Error Alert Dialog
+        // On-Device Neural Engine / VLM Error Alert Dialog
         backendError?.let { err ->
             AlertDialog(
                 onDismissRequest = {
@@ -715,7 +734,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                     Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 },
                 title = {
-                    Text("⚠️ Multimodal AI Server Error", fontWeight = FontWeight.Bold)
+                    Text("⚠️ On-Device VLM Error", fontWeight = FontWeight.Bold)
                 },
                 text = {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -724,31 +743,22 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.error
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "Verify or update host laptop backend address:",
+                            text = "Engine is running in 100% On-Device Standalone mode. No localhost connection is required.",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = customBackendIp,
-                            onValueChange = { customBackendIp = it },
-                            label = { Text("Backend URL") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 },
                 confirmButton = {
                     Button(
                         onClick = {
-                            RetrofitClient.setBaseUrl(customBackendIp)
                             backendError = null
                             triggerBatchAudit()
                         }
                     ) {
-                        Text("Update & Retry")
+                        Text("Retry Audit")
                     }
                 },
                 dismissButton = {
@@ -764,42 +774,140 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             )
         }
 
-        // Manual Host IP Configuration Dialog
-        if (showIpDialog) {
-            var tempIp by remember { mutableStateOf(RetrofitClient.getBaseUrl()) }
+        // Snapdragon 8 Elite & On-Device VLM Hardware Hub Modal
+        if (showHardwareDialog) {
             AlertDialog(
-                onDismissRequest = { showIpDialog = false },
-                title = { Text("Configure Backend VLM Server IP", fontWeight = FontWeight.Bold) },
+                onDismissRequest = { showHardwareDialog = false },
+                title = {
+                    Text("⚡ Snapdragon 8 Elite & VLM Hub", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                },
                 text = {
-                    Column {
-                        Text(
-                            "Enter the URL of the laptop running the Qwen2.5-VL backend (e.g., http://192.168.88.8:8000):",
-                            fontSize = 13.sp
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedTextField(
-                            value = tempIp,
-                            onValueChange = { tempIp = it },
-                            label = { Text("Server URL") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Hardware Architecture Card
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("SoC: Qualcomm Snapdragon 8 Elite (SM8750)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("• 2x Oryon Prime Cores @ 4.32 GHz", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("• 6x Oryon Performance Cores @ 3.53 GHz", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("• 24 GB LPDDR5X RAM (5300 MHz) | Large Heap", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("• 8-Thread Multi-Core ONNX Runtime Engine", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+
+                        // Live Memory Telemetry
+                        Text("Live Memory Telemetry", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    "Committed VLM RAM: ${String.format("%.2f", memoryStats.allocatedVlmBufferGb)} GB",
+                                    color = Color(0xFF4ADE80),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    "Process PSS: ${memoryStats.appProcessPssMb} MB | Native Heap: ${memoryStats.nativeHeapAllocatedMb} MB",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    "Device RAM: ${String.format("%.1f", memoryStats.deviceAvailableRamGb)} GB free / ${String.format("%.1f", memoryStats.deviceTotalRamGb)} GB total",
+                                    color = Color(0xFF94A3B8),
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    "Status: ${vlmEngine.statusMessage}",
+                                    color = Color(0xFF38BDF8),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+
+                        // Allocation Tier Selection
+                        Text("Select On-Device VLM RAM Tier", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.values().forEach { tier ->
+                            val isSelected = selectedTier == tier
+                            Surface(
+                                onClick = { selectedTier = tier },
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedTier = tier }
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(tier.displayName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(tier.approxParams, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Action Buttons: Allocate vs Release
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    scope.launch {
+                                        isAllocatingTier = true
+                                        vlmEngine.warmUpModelInRamAsync(selectedTier)
+                                        memoryStats = vlmEngine.getMemoryStats()
+                                        isAllocatingTier = false
+                                    }
+                                },
+                                enabled = !isAllocatingTier,
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (isAllocatingTier) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Committing...", fontSize = 12.sp)
+                                } else {
+                                    Text("Allocate in RAM", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    vlmEngine.releaseRam()
+                                    memoryStats = vlmEngine.getMemoryStats()
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Release RAM", fontSize = 12.sp)
+                            }
+                        }
                     }
                 },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            RetrofitClient.setBaseUrl(tempIp)
-                            customBackendIp = tempIp
-                            showIpDialog = false
-                        }
-                    ) {
-                        Text("Save")
-                    }
-                },
-                dismissButton = {
-                    OutlinedButton(onClick = { showIpDialog = false }) {
-                        Text("Cancel")
+                    Button(onClick = { showHardwareDialog = false }) {
+                        Text("Close")
                     }
                 }
             )
