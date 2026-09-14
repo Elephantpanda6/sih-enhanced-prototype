@@ -54,6 +54,9 @@ class OnDeviceVlmEngine(private val context: Context) {
     var discoveredModelFile: File? = null
         private set
 
+    var ggufInfo: GgufModelReader.GgufModelInfo? = null
+        private set
+
     init {
         scanForModelFiles()
     }
@@ -72,10 +75,13 @@ class OnDeviceVlmEngine(private val context: Context) {
                     val files = dir.listFiles { file ->
                         val name = file.name.lowercase()
                         (name.endsWith(".gguf") || name.endsWith(".onnx") || name.endsWith(".bin") || name.endsWith(".ort")) &&
-                        (name.contains("7b") || name.contains("qwen") || name.contains("vlm"))
+                        (name.contains("7b") || name.contains("qwen") || name.contains("vlm") || name.contains("2b"))
                     }
                     if (!files.isNullOrEmpty()) {
                         discoveredModelFile = files.first()
+                        if (discoveredModelFile!!.name.endsWith(".gguf", ignoreCase = true)) {
+                            ggufInfo = GgufModelReader.parseHeader(discoveredModelFile!!)
+                        }
                         return discoveredModelFile
                     }
                 }
@@ -113,9 +119,18 @@ class OnDeviceVlmEngine(private val context: Context) {
     }
 
     /**
-     * Allocates and touches multi-gigabyte direct native memory buffers.
-     * This commits physical RAM pages, directly registering high RAM utilization
-     * in the Android OS memory monitor (Developer Options / Running Services / Game Space).
+     * Optional lightweight 2B vision model download (1.5 GB) for faster testing.
+     */
+    fun downloadLightweightVisionModel(): Long {
+        return downloadModelWeights(
+            url = "https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct-GGUF/resolve/main/qwen2-vl-2b-instruct-q4_k_m.gguf",
+            fileName = "qwen2-vl-2b-instruct-q4_k_m.gguf"
+        )
+    }
+
+    /**
+     * Allocates and memory-maps the multi-gigabyte GGUF model in 64-bit Linux native RAM.
+     * Avoids ART Java heap ceilings by using Linux kernel file-backed mmap pages.
      */
     suspend fun warmUpModelInRamAsync(tier: RamTier): Boolean = withContext(Dispatchers.Default) {
         warmUpModelInRam(tier)
@@ -128,38 +143,27 @@ class OnDeviceVlmEngine(private val context: Context) {
         try {
             statusMessage = "Allocating ${tier.displayName} in LPDDR5X RAM..."
             scanForModelFiles()
-            var fileMappedBytes = 0L
 
-            discoveredModelFile?.let { file ->
-                try {
-                    val fileLength = file.length()
-                    val mappedBuffer = java.io.FileInputStream(file).channel.map(
-                        java.nio.channels.FileChannel.MapMode.READ_ONLY,
-                        0,
-                        fileLength
-                    )
-                    nativeBuffers.add(mappedBuffer)
-                    fileMappedBytes = fileLength
-                    Log.i(TAG, "Memory-mapped physical weights file: ${file.name} (${fileLength / (1024 * 1024)} MB)")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Could not mmap physical file: ${e.message}")
-                }
-            }
-
-            val remainingBytes = (tier.sizeBytes - fileMappedBytes).coerceAtLeast(0L)
-
-            if (discoveredModelFile != null) {
-                allocatedRamBytes = fileMappedBytes
+            val file = discoveredModelFile
+            if (file != null && file.exists()) {
+                val mappedBuffers = GgufModelReader.memoryMapGguf(file)
+                nativeBuffers.addAll(mappedBuffers)
+                allocatedRamBytes = file.length()
                 isModelLoadedInRam = true
                 isAllocating = false
-                statusMessage = "Active: Mapped ${discoveredModelFile?.name} (${String.format("%.2f", fileMappedBytes / (1024.0 * 1024 * 1024))} GB in unified memory)"
-                Log.i(TAG, "Successfully memory-mapped ${discoveredModelFile?.name} into unified RAM.")
+
+                val archName = ggufInfo?.architecture ?: "qwen2vl"
+                val name = ggufInfo?.modelName ?: file.name
+                val sizeGbStr = String.format("%.2f", file.length() / (1024.0 * 1024.0 * 1024.0))
+
+                statusMessage = "Active: Mapped $name [$archName] ($sizeGbStr GB in unified RAM)"
+                Log.i(TAG, "Successfully loaded $name into native memory ($sizeGbStr GB).")
                 return true
             } else {
                 allocatedRamBytes = 0L
                 isModelLoadedInRam = false
                 isAllocating = false
-                statusMessage = "Weights not found in storage. Place .gguf in /sdcard/Download/ or use Dual ONNX / Gemini API."
+                statusMessage = "Weights not found in storage. Tap Download (4.8 GB) or use Dual ONNX Engine."
                 Log.i(TAG, "No physical weights found for ${tier.displayName}.")
                 return false
             }

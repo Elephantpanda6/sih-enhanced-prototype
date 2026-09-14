@@ -953,21 +953,37 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             Column(modifier = Modifier.padding(10.dp)) {
                                 if (vlmEngine.discoveredModelFile != null) {
                                     Text("📦 Physical Weights Detected:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF2E7D32))
-                                    Text("${vlmEngine.discoveredModelFile?.name} (${String.format("%.2f", (vlmEngine.discoveredModelFile?.length() ?: 0) / (1024.0 * 1024.0 * 1024.0))} GB)", fontSize = 11.sp)
+                                    Text("• File: ${vlmEngine.discoveredModelFile?.name}", fontSize = 11.sp)
+                                    vlmEngine.ggufInfo?.let { info ->
+                                        Text("• Architecture: ${info.architecture} | Model: ${info.modelName}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("• Tensors: ${info.tensorCount} | Size: ${String.format("%.2f", info.fileSizeGb)} GB", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
                                 } else {
                                     Text("📁 Model Storage Path:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Text("/sdcard/Download/ or /sdcard/models/", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("Supports: .gguf, .onnx, .ort weights files", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Supports: .gguf (Qwen2.5-VL), .onnx, .ort", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Button(
-                                            onClick = {
-                                                vlmEngine.downloadModelWeights()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("📥 Download 7B (4.8GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            Button(
+                                                onClick = {
+                                                    vlmEngine.downloadModelWeights()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("📥 Download 7B (4.8GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                            Button(
+                                                onClick = {
+                                                    vlmEngine.downloadLightweightVisionModel()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.weight(1f),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
+                                            ) {
+                                                Text("⚡ Download 2B (1.5GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            }
                                         }
                                         OutlinedButton(
                                             onClick = {
@@ -975,9 +991,9 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                                 context.startActivity(intent)
                                             },
                                             shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.fillMaxWidth()
                                         ) {
-                                            Text("🌐 HuggingFace", fontSize = 10.sp)
+                                            Text("🌐 View Qwen2.5-VL on HuggingFace", fontSize = 10.sp)
                                         }
                                     }
                                 }
