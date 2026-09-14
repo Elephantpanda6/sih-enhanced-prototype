@@ -147,29 +147,22 @@ class OnDeviceVlmEngine(private val context: Context) {
             }
 
             val remainingBytes = (tier.sizeBytes - fileMappedBytes).coerceAtLeast(0L)
-            val chunkSize = 512 * 1024 * 1024 // 512 MB chunks to stay within single direct buffer limits
-            val numChunks = (remainingBytes / chunkSize).toInt()
 
-            for (i in 0 until numChunks) {
-                val directBuffer = ByteBuffer.allocateDirect(chunkSize)
-                // Touch memory pages to force Linux kernel page allocation into RSS/PSS
-                val step = 4096 // 4KB page size
-                for (p in 0 until chunkSize step step) {
-                    directBuffer.put(p, (p and 0xFF).toByte())
-                }
-                nativeBuffers.add(directBuffer)
-            }
-
-            allocatedRamBytes = fileMappedBytes + (numChunks.toLong() * chunkSize)
-            isModelLoadedInRam = true
-            isAllocating = false
-            statusMessage = if (discoveredModelFile != null) {
-                "Active: ${tier.approxParams} [Mapped ${discoveredModelFile?.name}] (${String.format("%.1f", allocatedRamBytes / (1024.0 * 1024 * 1024))} GB RAM)"
+            if (discoveredModelFile != null) {
+                allocatedRamBytes = fileMappedBytes
+                isModelLoadedInRam = true
+                isAllocating = false
+                statusMessage = "Active: Mapped ${discoveredModelFile?.name} (${String.format("%.2f", fileMappedBytes / (1024.0 * 1024 * 1024))} GB in unified memory)"
+                Log.i(TAG, "Successfully memory-mapped ${discoveredModelFile?.name} into unified RAM.")
+                return true
             } else {
-                "Active: ${tier.approxParams} in RAM (${String.format("%.1f", allocatedRamBytes / (1024.0 * 1024 * 1024))} GB)"
+                allocatedRamBytes = 0L
+                isModelLoadedInRam = false
+                isAllocating = false
+                statusMessage = "Weights not found in storage. Place .gguf in /sdcard/Download/ or use Dual ONNX / Gemini API."
+                Log.i(TAG, "No physical weights found for ${tier.displayName}.")
+                return false
             }
-            Log.i(TAG, "Successfully allocated and committed ${tier.displayName} in native LPDDR5X RAM.")
-            return true
         } catch (e: OutOfMemoryError) {
             Log.e(TAG, "OOM while allocating ${tier.displayName}: ${e.message}", e)
             releaseRam()
