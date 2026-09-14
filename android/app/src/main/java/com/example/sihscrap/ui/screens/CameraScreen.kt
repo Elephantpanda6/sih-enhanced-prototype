@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -448,6 +449,145 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // PROMINENT DIRECT ON-SCREEN MODEL SELECTION BAR
+            Surface(
+                color = Color.Black.copy(alpha = 0.85f),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                shadowElevation = 8.dp,
+                modifier = Modifier.padding(bottom = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "🧠 Model:",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(end = 2.dp)
+                    )
+
+                    // 3B Model Chip
+                    val is3B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16
+                    Surface(
+                        onClick = {
+                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16
+                            scope.launch {
+                                isAllocatingTier = true
+                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16)
+                                memoryStats = vlmEngine.getMemoryStats()
+                                isAllocatingTier = false
+                            }
+                        },
+                        color = if (is3B) Color(0xFF00C853) else Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = if (!is3B) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
+                    ) {
+                        Text(
+                            text = "3B (4 GB)",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = if (is3B) FontWeight.ExtraBold else FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    // 5B Model Chip
+                    val is5B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16
+                    Surface(
+                        onClick = {
+                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16
+                            scope.launch {
+                                isAllocatingTier = true
+                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16)
+                                memoryStats = vlmEngine.getMemoryStats()
+                                isAllocatingTier = false
+                            }
+                        },
+                        color = if (is5B) Color(0xFF00C853) else Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = if (!is5B) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
+                    ) {
+                        Text(
+                            text = "5B (7.5 GB)",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = if (is5B) FontWeight.ExtraBold else FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    // 7B Model Chip (Qwen2.5-VL-7B)
+                    val is7B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16
+                    Surface(
+                        onClick = {
+                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16
+                            scope.launch {
+                                isAllocatingTier = true
+                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16)
+                                memoryStats = vlmEngine.getMemoryStats()
+                                isAllocatingTier = false
+                            }
+                        },
+                        color = if (is7B) Color(0xFFFF6D00) else Color.White.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = if (!is7B) BorderStroke(1.dp, Color(0xFFFF9100).copy(alpha = 0.5f)) else null
+                    ) {
+                        Text(
+                            text = "🔥 7B (12 GB)",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = if (is7B) FontWeight.ExtraBold else FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+
+                    // Hardware Settings modal launcher
+                    IconButton(
+                        onClick = {
+                            memoryStats = vlmEngine.getMemoryStats()
+                            showHardwareDialog = true
+                        },
+                        modifier = Modifier.size(26.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Hardware Info",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            // Allocation in progress banner
+            if (isAllocatingTier) {
+                Surface(
+                    color = Color(0xFF1E293B).copy(alpha = 0.95f),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF38BDF8), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Allocating ${selectedTier.displayName} in LPDDR5X RAM...",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -473,7 +613,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                 text = when {
                                     isEngineError -> "Neural engine error | Inspect device logs"
                                     isNoDetection -> "Targeting: Align mouse, phone, laptop, fan, AC, or scrap in box"
-                                    else -> "Confidence: ${(currentResult.confidence * 100).toInt()}% | Dual YOLO Neural Engine"
+                                    else -> "Confidence: ${(currentResult.confidence * 100).toInt()}% | Dual YOLO + ${selectedTier.approxParams}"
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -548,8 +688,9 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             } else {
                                 Icon(Icons.Default.Camera, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
+                                val modelTag = if (selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16) "7B" else if (selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16) "5B" else "3B"
                                 Text(
-                                    if (isNoDetection) "Audit Viewfinder" else "Add to Batch",
+                                    if (isNoDetection) "Audit Viewfinder ($modelTag)" else "Add to Batch ($modelTag)",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
