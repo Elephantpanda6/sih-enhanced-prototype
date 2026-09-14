@@ -87,6 +87,32 @@ class OnDeviceVlmEngine(private val context: Context) {
     }
 
     /**
+     * Triggers native background download of the 7B weights file directly to /sdcard/Download/.
+     * Android DownloadManager handles download resumption and system notifications.
+     */
+    fun downloadModelWeights(
+        url: String = "https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/qwen2.5-vl-7b-instruct-q4_k_m.gguf",
+        fileName: String = "qwen2.5-vl-7b-instruct-q4_k_m.gguf"
+    ): Long {
+        return try {
+            val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+            val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
+                .setTitle("Qwen2.5-VL-7B Weights")
+                .setDescription("Downloading 7B Vision Model for RedMagic 11 Pro")
+                .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+            statusMessage = "Downloading $fileName via Android DownloadManager..."
+            downloadManager.enqueue(request)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enqueue download: ${e.message}", e)
+            statusMessage = "Download failed: ${e.message}"
+            -1L
+        }
+    }
+
+    /**
      * Allocates and touches multi-gigabyte direct native memory buffers.
      * This commits physical RAM pages, directly registering high RAM utilization
      * in the Android OS memory monitor (Developer Options / Running Services / Game Space).

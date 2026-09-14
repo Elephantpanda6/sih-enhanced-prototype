@@ -958,6 +958,28 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                     Text("📁 Model Storage Path:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Text("/sdcard/Download/ or /sdcard/models/", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     Text("Supports: .gguf, .onnx, .ort weights files", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
+                                            onClick = {
+                                                vlmEngine.downloadModelWeights()
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("📥 Download 7B (4.8GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct-GGUF"))
+                                                context.startActivity(intent)
+                                            },
+                                            shape = RoundedCornerShape(8.dp),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🌐 HuggingFace", fontSize = 10.sp)
+                                        }
+                                    }
                                 }
                             }
                         }
