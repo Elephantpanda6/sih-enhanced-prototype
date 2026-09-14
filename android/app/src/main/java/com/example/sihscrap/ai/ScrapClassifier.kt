@@ -100,7 +100,7 @@ class ScrapClassifier(private val context: Context) {
             val modelBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
 
             val options = Interpreter.Options().apply {
-                setNumThreads(2) // Strictly adhere to Android Go memory/CPU footprint (<60MB)
+                setNumThreads(4) // High performance multi-threaded inference on modern multicore hardware
             }
             interpreter = Interpreter(modelBuffer, options)
             Log.d(TAG, "TFLite scrap classifier model initialized successfully.")

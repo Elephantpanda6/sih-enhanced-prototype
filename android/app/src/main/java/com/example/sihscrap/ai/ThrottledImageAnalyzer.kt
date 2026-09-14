@@ -18,12 +18,12 @@ class ThrottledImageAnalyzer(
 
     private val TAG = "ThrottledAnalyzer"
     private var lastAnalyzedTimestamp: Long = 0L
-    private val THROTTLE_INTERVAL_MS: Long = 300L // 3 frames per second for responsive scanning
+    private val THROTTLE_INTERVAL_MS: Long = 180L // ~5.5 FPS responsive, high-fidelity frame sampling
 
     override fun analyze(imageProxy: ImageProxy) {
         val currentTimestamp = System.currentTimeMillis()
         if (currentTimestamp - lastAnalyzedTimestamp < THROTTLE_INTERVAL_MS) {
-            // Strictly dispose imageProxy immediately to prevent heap spikes on Android Go
+            // Strictly dispose imageProxy immediately
             imageProxy.close()
             return
         }
@@ -46,7 +46,7 @@ class ThrottledImageAnalyzer(
     private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
             imageProxy.toBitmap()?.let {
-                Bitmap.createScaledBitmap(it, 224, 224, false)
+                Bitmap.createScaledBitmap(it, 224, 224, true)
             }
         } catch (e: Exception) {
             try {
@@ -63,7 +63,7 @@ class ThrottledImageAnalyzer(
                         Bitmap.Config.ARGB_8888
                     )
                     bitmap.copyPixelsFromBuffer(buffer)
-                    Bitmap.createScaledBitmap(bitmap, 224, 224, false)
+                    Bitmap.createScaledBitmap(bitmap, 224, 224, true)
                 } else null
             } catch (fallbackEx: Exception) {
                 Log.e(TAG, "Failed to convert ImageProxy to Bitmap: ${e.message}")

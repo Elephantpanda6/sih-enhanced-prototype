@@ -26,16 +26,15 @@ VOSK_DIR = MODELS_DIR / "vosk"
 
 # Verified lightweight models suitable for mobile edge & local PC inference
 MODEL_REGISTRY = {
-    "qwen2.5-vl-3b-int4": {
-        "description": "Qwen2.5-VL 3B Instruct 4-bit Quantized Vision-Language Model (Mobile & Edge PC)",
-        "hf_repo": "Qwen/Qwen2.5-VL-3B-Instruct-AWQ",
-        "gguf_repo": "Qwen/Qwen2.5-VL-3B-Instruct-GGUF",
-        "filename": "qwen2.5-vl-3b-instruct-q4_k_m.gguf",
-        "size_mb": 2100,
+    "qwen2.5-vl-3b-fp16": {
+        "description": "Qwen2.5-VL 3B Instruct Full-Precision FP16 Vision-Language Model (Unquantized, Max Accuracy)",
+        "hf_repo": "Qwen/Qwen2.5-VL-3B-Instruct",
+        "precision": "float16",
+        "size_mb": 6200,
         "type": "vlm"
     },
     "mobilenetv3-scrap-onnx": {
-        "description": "MobileNet-V3 Small 15-Class Scrap Classifier (ONNX Edge Runtime)",
+        "description": "MobileNet-V3 Small 27-Class Scrap & Appliance Classifier (ONNX FP32 Full Precision)",
         "filename": "scrap_mobilenet_v3.onnx",
         "size_mb": 12,
         "type": "vision"
@@ -86,14 +85,20 @@ def download_file_with_progress(url: str, dest_path: Path):
 
 
 def setup_offline_vlm_config():
-    """Generates the edge runtime configuration for Qwen2.5-VL / MobileVLM."""
+    """Generates unquantized edge runtime configuration for Qwen2.5-VL / MobileVLM with maximum accuracy."""
     config_file = OFFLINE_VLM_DIR / "vlm_runtime_config.json"
     config = {
         "primary_offline_vlm": "Qwen/Qwen2.5-VL-3B-Instruct",
-        "quantization": "int4_awq",
+        "quantization": "none",
+        "precision": "float16_full_accuracy",
+        "quantization_disabled_reason": "Prioritizing classification accuracy and bounding box precision with 8GB VRAM / 24GB Mobile RAM headroom",
         "supports_offline_24x7": True,
         "supported_scrap_categories": [
-            "e_waste_pcb_high", "e_waste_smartphone", "copper_bare_bright",
+            "ewaste_computer_mouse", "ewaste_smartphone", "ewaste_laptop",
+            "ewaste_electric_fan", "ewaste_air_conditioner", "ewaste_keyboard",
+            "ewaste_monitor_display", "ewaste_microwave_oven", "ewaste_refrigerator_fridge",
+            "ewaste_washing_machine", "ewaste_printer_scanner", "ewaste_power_adapter_charger",
+            "ewaste_router_modem", "high_grade_server_pcb", "copper_bare_bright",
             "copper_armature", "brass_honey", "aluminium_extrusions",
             "iron_hms_heavy", "light_iron_patra", "battery_lead_acid",
             "battery_li_ion", "cardboard_carton", "pet_plastic"
@@ -103,11 +108,11 @@ def setup_offline_vlm_config():
             "hi": "कबाड़ और ई-कचरे की पहचान करें और सीपीसीबी सुरक्षा चेतावनी दें।",
             "mr": "भंगार आणि ई-कचरा ओळखून सीपीसीबी सुरक्षा नियम द्या."
         },
-        "device_targets": ["Android_NPU", "Android_CPU", "Server_CUDA", "Edge_CPU"]
+        "device_targets": ["Android_NPU", "Android_GPU", "Server_CUDA_RTX4060", "Snapdragon_8_Elite"]
     }
     with open(config_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
-    logger.info(f"Generated offline VLM configuration at: {config_file}")
+    logger.info(f"Generated unquantized offline VLM configuration at: {config_file}")
 
 
 def check_local_model_status():

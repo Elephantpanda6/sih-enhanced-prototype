@@ -40,7 +40,7 @@ class YoloScrapClassifier(private val context: Context) {
             val modelBuffer = fileChannel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
             
             val options = Interpreter.Options().apply {
-                setNumThreads(2)
+                setNumThreads(4) // High performance multi-threading on Snapdragon 8 Elite Oryon cores
             }
             interpreter = Interpreter(modelBuffer, options)
             Log.d(TAG, "TFLite Edge Vision Model initialized successfully!")

@@ -23,11 +23,12 @@ def train_and_export():
         name='scrap_seg_model'
     )
     
-    print("Training complete. Exporting model to TensorFlow Lite (LiteRT)...")
+    print("Training complete. Exporting unquantized model to TensorFlow Lite (LiteRT)...")
     export_path = model.export(
         format='litert',
         imgsz=224,
-        int8=True
+        int8=False, # Full precision Float32 for maximum accuracy
+        half=False
     )
     
     print(f"Export successful! TFLite model saved at: {export_path}")

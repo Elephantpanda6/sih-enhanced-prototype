@@ -1,10 +1,24 @@
 {
   "primary_offline_vlm": "Qwen/Qwen2.5-VL-3B-Instruct",
-  "quantization": "int4_awq",
+  "quantization": "none",
+  "precision": "float16_full_accuracy",
+  "quantization_disabled_reason": "Prioritizing classification accuracy and bounding box precision with 8GB VRAM / 24GB Mobile RAM headroom",
   "supports_offline_24x7": true,
   "supported_scrap_categories": [
-    "e_waste_pcb_high",
-    "e_waste_smartphone",
+    "ewaste_computer_mouse",
+    "ewaste_smartphone",
+    "ewaste_laptop",
+    "ewaste_electric_fan",
+    "ewaste_air_conditioner",
+    "ewaste_keyboard",
+    "ewaste_monitor_display",
+    "ewaste_microwave_oven",
+    "ewaste_refrigerator_fridge",
+    "ewaste_washing_machine",
+    "ewaste_printer_scanner",
+    "ewaste_power_adapter_charger",
+    "ewaste_router_modem",
+    "high_grade_server_pcb",
     "copper_bare_bright",
     "copper_armature",
     "brass_honey",
@@ -23,8 +37,8 @@
   },
   "device_targets": [
     "Android_NPU",
-    "Android_CPU",
-    "Server_CUDA",
-    "Edge_CPU"
+    "Android_GPU",
+    "Server_CUDA_RTX4060",
+    "Snapdragon_8_Elite"
   ]
 }
