@@ -27,13 +27,65 @@ import java.nio.ByteBuffer
 class OnDeviceVlmEngine(private val context: Context) {
     private val TAG = "OnDeviceVlmEngine"
 
-    enum class RamTier(val displayName: String, val sizeBytes: Long, val approxParams: String) {
-        TIER_3B_FP16("3B VLM Tier (4.0 GB RAM)", 4L * 1024 * 1024 * 1024, "3.0 Billion Parameters (FP16)"),
-        TIER_5B_FP16("5B VLM Tier (7.5 GB RAM)", (7.5 * 1024 * 1024 * 1024).toLong(), "5.0 Billion Parameters (FP16)"),
-        TIER_7B_FP16("7B VLM Tier (12.0 GB RAM)", 12L * 1024 * 1024 * 1024, "7.0 Billion Parameters (Qwen2.5-VL-7B FP16)")
+    enum class RamTier(
+        val displayName: String,
+        val sizeBytes: Long,
+        val approxParams: String,
+        val description: String
+    ) {
+        TIER_7B_FP16(
+            "Qwen2.5-VL-7B (Recommended)",
+            12L * 1024 * 1024 * 1024,
+            "7.0B Params (Q4_K_M GGUF)",
+            "Deep multimodal CPCB hazardous e-waste compliance, PCB component grading, and structural damage analysis."
+        ),
+        TIER_2B_GGUF(
+            "Qwen2-VL-2B (Fast)",
+            (1.5 * 1024 * 1024 * 1024).toLong(),
+            "2.0B Params (Q4_K_M GGUF)",
+            "High-speed multimodal vision analysis with 986 MB download footprint."
+        ),
+        TIER_3B_FP16(
+            "3B Vision Tier",
+            4L * 1024 * 1024 * 1024,
+            "3.0B Parameters",
+            "Balanced mobile profile mapped into 4.0 GB unified RAM."
+        ),
+        TIER_5B_FP16(
+            "5B Vision Tier",
+            (7.5 * 1024 * 1024 * 1024).toLong(),
+            "5.0B Parameters",
+            "High-fidelity vision encoder mapped into 7.5 GB unified RAM."
+        ),
+        TIER_DUAL_ONNX(
+            "Dual YOLO ONNX Engine",
+            0L,
+            "27 Classes | 8 Cores",
+            "Real-time object detection across 8 Oryon CPU cores. 100% built-in, zero downloads required."
+        )
     }
 
-    var selectedTier: RamTier = RamTier.TIER_3B_FP16
+    companion object {
+        private const val PREFS_NAME = "vlm_settings_prefs"
+        private const val KEY_TIER = "selected_ram_tier"
+
+        fun getSavedTier(context: Context): RamTier {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val name = prefs.getString(KEY_TIER, RamTier.TIER_7B_FP16.name)
+            return try {
+                RamTier.valueOf(name ?: RamTier.TIER_7B_FP16.name)
+            } catch (e: Exception) {
+                RamTier.TIER_7B_FP16
+            }
+        }
+
+        fun saveTier(context: Context, tier: RamTier) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString(KEY_TIER, tier.name).apply()
+        }
+    }
+
+    var selectedTier: RamTier = getSavedTier(context)
         private set
 
     var isModelLoadedInRam: Boolean = false
@@ -45,7 +97,7 @@ class OnDeviceVlmEngine(private val context: Context) {
     var isAllocating: Boolean = false
         private set
 
-    var statusMessage: String = "Ready to allocate VLM RAM (Select 3B / 5B / 7B Tier)"
+    var statusMessage: String = "Ready (Active Tier: ${selectedTier.displayName})"
         private set
 
     // Holds pinned native memory buffers for the unquantized weights
@@ -58,6 +110,7 @@ class OnDeviceVlmEngine(private val context: Context) {
         private set
 
     init {
+        selectedTier = getSavedTier(context)
         scanForModelFiles()
     }
 
@@ -154,8 +207,19 @@ class OnDeviceVlmEngine(private val context: Context) {
 
     fun warmUpModelInRam(tier: RamTier): Boolean {
         selectedTier = tier
+        saveTier(context, tier)
         isAllocating = true
         releaseRam()
+
+        if (tier == RamTier.TIER_DUAL_ONNX) {
+            allocatedRamBytes = 0L
+            isModelLoadedInRam = true
+            isAllocating = false
+            statusMessage = "Active: Dual YOLO ONNX Engine (27 Classes | 8 Oryon Cores)"
+            Log.i(TAG, "Dual YOLO ONNX Engine active.")
+            return true
+        }
+
         try {
             statusMessage = "Allocating ${tier.displayName} in LPDDR5X RAM..."
             scanForModelFiles()
@@ -179,7 +243,7 @@ class OnDeviceVlmEngine(private val context: Context) {
                 allocatedRamBytes = 0L
                 isModelLoadedInRam = false
                 isAllocating = false
-                statusMessage = "Weights not found in storage. Tap Download (4.8 GB) or use Dual ONNX Engine."
+                statusMessage = "Weights not found in storage. Tap Download 7B (4.68 GB) or use Dual ONNX Engine."
                 Log.i(TAG, "No physical weights found for ${tier.displayName}.")
                 return false
             }

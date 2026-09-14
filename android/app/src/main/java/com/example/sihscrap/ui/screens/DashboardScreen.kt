@@ -104,6 +104,13 @@ fun DashboardScreen(
                     ) {
                         Icon(Icons.Default.Calculate, contentDescription = "Calculator", tint = MaterialTheme.colorScheme.outline)
                     }
+
+                    // AI & Hardware Settings Access (Cogwheel)
+                    IconButton(
+                        onClick = { navController.navigate("settings") }
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurface)
+                    }
                 }
             )
         }

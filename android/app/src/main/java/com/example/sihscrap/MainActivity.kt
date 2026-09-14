@@ -1,4 +1,4 @@
-﻿package com.example.sihscrap
+package com.example.sihscrap
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -91,6 +91,9 @@ class MainActivity : ComponentActivity() {
                         }
                         composable("duress_calc") {
                             DuressCalculatorScreen(navController)
+                        }
+                        composable("settings") {
+                            SettingsScreen(navController, voiceEngine)
                         }
                     }
                 }

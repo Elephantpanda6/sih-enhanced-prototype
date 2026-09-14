@@ -18,11 +18,12 @@ import androidx.compose.foundation.shape.CircleShape
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -82,10 +83,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
     }
 
     val vlmEngine = remember { com.example.sihscrap.ai.OnDeviceVlmEngine(context) }
-    var memoryStats by remember { mutableStateOf(vlmEngine.getMemoryStats()) }
-    var selectedTier by remember { mutableStateOf(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16) }
-    var showHardwareDialog by remember { mutableStateOf(false) }
-    var isAllocatingTier by remember { mutableStateOf(false) }
+    var selectedTier by remember { mutableStateOf(com.example.sihscrap.ai.OnDeviceVlmEngine.getSavedTier(context)) }
 
     var backendError by remember { mutableStateOf<String?>(null) }
     var isShutterLocked by remember { mutableStateOf(false) }
@@ -101,10 +99,9 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
     var isDropdownExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        isAllocatingTier = true
-        vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16)
-        memoryStats = vlmEngine.getMemoryStats()
-        isAllocatingTier = false
+        val tier = com.example.sihscrap.ai.OnDeviceVlmEngine.getSavedTier(context)
+        selectedTier = tier
+        vlmEngine.warmUpModelInRamAsync(tier)
     }
 
     val triggerBatchAudit: () -> Unit = {
@@ -285,7 +282,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                 onClick = { navController.popBackStack() },
                 modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
 
             // Camera Selection Dropdown Menu
@@ -377,66 +374,31 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                 }
             }
 
-            // Material Tier Badge
-            Surface(
-                color = tierColor,
-                shape = RoundedCornerShape(20.dp),
-                shadowElevation = 4.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = currentResult.materialTier.displayName,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                )
-            }
-        }
-
-        // AI Engine Status & On-Device Hardware Pill Banner
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 96.dp, start = 16.dp, end = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                color = if (classifier.isOperational) Color(0xFF1B5E20).copy(alpha = 0.85f) else Color(0xFFB71C1C).copy(alpha = 0.85f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, if (classifier.isOperational) Color(0xFF4CAF50) else Color(0xFFEF5350))
-            ) {
-                Text(
-                    text = if (classifier.isOperational) "🟢 ${classifier.engineStatus}" else "🔴 ${classifier.engineStatus}",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    maxLines = 1
-                )
-            }
-
-            Surface(
-                onClick = {
-                    memoryStats = vlmEngine.getMemoryStats()
-                    showHardwareDialog = true
-                },
-                color = Color(0xFF0D47A1).copy(alpha = 0.85f),
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color(0xFF42A5F5))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Material Tier Badge
+                Surface(
+                    color = tierColor,
+                    shape = RoundedCornerShape(20.dp),
+                    shadowElevation = 4.dp
                 ) {
-                    val ramGb = vlmEngine.allocatedRamBytes / (1024.0 * 1024.0 * 1024.0)
                     Text(
-                        text = if (isAllocatingTier) "⏳ Allocating RAM..." else "🧠 ${String.format("%.1f", ramGb)} GB VLM RAM ⚙️",
+                        text = currentResult.materialTier.displayName,
                         color = Color.White,
-                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 1
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                     )
+                }
+
+                // AI & Hardware Settings
+                IconButton(
+                    onClick = { navController.navigate("settings") },
+                    modifier = Modifier.background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                 }
             }
         }
@@ -449,167 +411,6 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // PROMINENT DIRECT ON-SCREEN MODEL SELECTION BAR
-            Surface(
-                color = Color.Black.copy(alpha = 0.85f),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
-                shadowElevation = 8.dp,
-                modifier = Modifier.padding(bottom = 10.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "🧠 Model:",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(end = 2.dp)
-                    )
-
-                    // 3B Model Chip
-                    val is3B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16
-                    Surface(
-                        onClick = {
-                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16
-                            scope.launch {
-                                isAllocatingTier = true
-                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_3B_FP16)
-                                memoryStats = vlmEngine.getMemoryStats()
-                                isAllocatingTier = false
-                            }
-                        },
-                        color = if (is3B) Color(0xFF00C853) else Color.White.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = if (!is3B) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
-                    ) {
-                        Text(
-                            text = "3B (4 GB)",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = if (is3B) FontWeight.ExtraBold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-
-                    // 5B Model Chip
-                    val is5B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16
-                    Surface(
-                        onClick = {
-                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16
-                            scope.launch {
-                                isAllocatingTier = true
-                                vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_5B_FP16)
-                                memoryStats = vlmEngine.getMemoryStats()
-                                isAllocatingTier = false
-                            }
-                        },
-                        color = if (is5B) Color(0xFF00C853) else Color.White.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = if (!is5B) BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)) else null
-                    ) {
-                        Text(
-                            text = "5B (7.5 GB)",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = if (is5B) FontWeight.ExtraBold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-
-                    // 7B Model Chip (Qwen2.5-VL-7B)
-                    val is7B = selectedTier == com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16
-                    Surface(
-                        onClick = {
-                            selectedTier = com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16
-                            scope.launch {
-                                isAllocatingTier = true
-                                val success = vlmEngine.warmUpModelInRamAsync(com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.TIER_7B_FP16)
-                                memoryStats = vlmEngine.getMemoryStats()
-                                isAllocatingTier = false
-                                if (!success && vlmEngine.discoveredModelFile == null) {
-                                    showHardwareDialog = true
-                                }
-                            }
-                        },
-                        color = if (is7B) Color(0xFFFF6D00) else Color.White.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = if (!is7B) BorderStroke(1.dp, Color(0xFFFF9100).copy(alpha = 0.5f)) else null
-                    ) {
-                        Text(
-                            text = "🔥 7B (12 GB)",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = if (is7B) FontWeight.ExtraBold else FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-
-                    // Direct Download button when no weights are detected
-                    if (vlmEngine.discoveredModelFile == null) {
-                        Surface(
-                            onClick = {
-                                memoryStats = vlmEngine.getMemoryStats()
-                                showHardwareDialog = true
-                            },
-                            color = Color(0xFF0284C7),
-                            shape = RoundedCornerShape(14.dp)
-                        ) {
-                            Text(
-                                text = "📥 Download",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                            )
-                        }
-                    }
-
-                    // Hardware Settings modal launcher
-                    IconButton(
-                        onClick = {
-                            memoryStats = vlmEngine.getMemoryStats()
-                            showHardwareDialog = true
-                        },
-                        modifier = Modifier.size(26.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Hardware Info",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-            }
-
-            // Allocation in progress banner
-            if (isAllocatingTier) {
-                Surface(
-                    color = Color(0xFF1E293B).copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color(0xFF38BDF8), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Allocating ${selectedTier.displayName} in LPDDR5X RAM...",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -930,11 +731,11 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                         Button(
                             onClick = {
                                 backendError = null
-                                showHardwareDialog = true
+                                navController.navigate("settings")
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0284C7))
                         ) {
-                            Text("📥 Model Hub")
+                            Text("⚙️ AI Settings")
                         }
                         OutlinedButton(
                             onClick = {
@@ -944,206 +745,6 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                         ) {
                             Text("Dismiss")
                         }
-                    }
-                }
-            )
-        }
-
-        // Snapdragon 8 Elite & On-Device VLM Hardware Hub Modal
-        if (showHardwareDialog) {
-            AlertDialog(
-                onDismissRequest = { showHardwareDialog = false },
-                title = {
-                    Text("⚡ Snapdragon 8 Elite & VLM Hub", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                },
-                text = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        // Hardware Architecture Card
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("SoC: Qualcomm Snapdragon 8 Elite (SM8750)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text("• 2x Oryon Prime Cores @ 4.32 GHz", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("• 6x Oryon Performance Cores @ 3.53 GHz", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("• 24 GB LPDDR5X RAM (5300 MHz) | Large Heap", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("• 8-Thread Multi-Core ONNX Runtime Engine", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        // Model Weights File Detection Info
-                        Surface(
-                            color = if (vlmEngine.discoveredModelFile != null) Color(0xFF1B5E20).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, if (vlmEngine.discoveredModelFile != null) Color(0xFF4CAF50) else Color.Gray.copy(alpha = 0.3f)),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                if (vlmEngine.discoveredModelFile != null) {
-                                    Text("📦 Physical Weights Detected:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF2E7D32))
-                                    Text("• File: ${vlmEngine.discoveredModelFile?.name}", fontSize = 11.sp)
-                                    vlmEngine.ggufInfo?.let { info ->
-                                        Text("• Architecture: ${info.architecture} | Model: ${info.modelName}", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text("• Tensors: ${info.tensorCount} | Size: ${String.format("%.2f", info.fileSizeGb)} GB", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                } else {
-                                    Text("📁 Model Storage Path:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                    Text("/sdcard/Download/ or /sdcard/models/", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("Supports: .gguf (Qwen2.5-VL), .onnx, .ort", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text("⚡ Direct 1-Tap GGUF Downloads:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text("Downloads directly to /sdcard/Download/ with background progress notification.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Button(
-                                            onClick = {
-                                                vlmEngine.downloadModelWeights()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text("📥 Download 7B (4.68 GB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = {
-                                                vlmEngine.downloadLightweightVisionModel()
-                                            },
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.weight(1f),
-                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00897B))
-                                        ) {
-                                            Text("⚡ Download 2B (986 MB)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    OutlinedButton(
-                                        onClick = {
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://huggingface.co/ggml-org/Qwen2.5-VL-7B-Instruct-GGUF"))
-                                            context.startActivity(intent)
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("🌐 View Qwen2.5-VL on HuggingFace", fontSize = 10.sp)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Live Memory Telemetry
-                        Text("Live Memory Telemetry", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Surface(
-                            color = Color(0xFF1E293B),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Text(
-                                    "Committed VLM RAM: ${String.format("%.2f", memoryStats.allocatedVlmBufferGb)} GB",
-                                    color = Color(0xFF4ADE80),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
-                                )
-                                Text(
-                                    "Process PSS: ${memoryStats.appProcessPssMb} MB | Native Heap: ${memoryStats.nativeHeapAllocatedMb} MB",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    "Device RAM: ${String.format("%.1f", memoryStats.deviceAvailableRamGb)} GB free / ${String.format("%.1f", memoryStats.deviceTotalRamGb)} GB total",
-                                    color = Color(0xFF94A3B8),
-                                    fontSize = 11.sp
-                                )
-                                Text(
-                                    "Status: ${vlmEngine.statusMessage}",
-                                    color = Color(0xFF38BDF8),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-
-                        // Allocation Tier Selection
-                        Text("Select On-Device VLM RAM Tier", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        com.example.sihscrap.ai.OnDeviceVlmEngine.RamTier.values().forEach { tier ->
-                            val isSelected = selectedTier == tier
-                            Surface(
-                                onClick = { selectedTier = tier },
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                shape = RoundedCornerShape(10.dp),
-                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.3f)),
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = isSelected,
-                                        onClick = { selectedTier = tier }
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
-                                        Text(tier.displayName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                        Text(tier.approxParams, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Action Buttons: Allocate vs Release
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    scope.launch {
-                                        isAllocatingTier = true
-                                        vlmEngine.warmUpModelInRamAsync(selectedTier)
-                                        memoryStats = vlmEngine.getMemoryStats()
-                                        isAllocatingTier = false
-                                    }
-                                },
-                                enabled = !isAllocatingTier,
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                if (isAllocatingTier) {
-                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Committing...", fontSize = 12.sp)
-                                } else {
-                                    Text("Allocate in RAM", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    vlmEngine.releaseRam()
-                                    memoryStats = vlmEngine.getMemoryStats()
-                                },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Release RAM", fontSize = 12.sp)
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    Button(onClick = { showHardwareDialog = false }) {
-                        Text("Close")
                     }
                 }
             )
