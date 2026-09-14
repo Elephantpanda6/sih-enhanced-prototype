@@ -1,3 +1,17 @@
+ewaste_computer_mouse
+ewaste_smartphone
+ewaste_laptop
+ewaste_electric_fan
+ewaste_air_conditioner
+ewaste_keyboard
+ewaste_monitor_display
+ewaste_microwave_oven
+ewaste_refrigerator_fridge
+ewaste_washing_machine
+ewaste_printer_scanner
+ewaste_power_adapter_charger
+ewaste_router_modem
+high_grade_server_pcb
 copper_bare_bright
 copper_armature
 brass_honey
@@ -7,8 +21,6 @@ aluminium_utensils
 heavy_steel_sariya
 light_iron_patra
 cast_iron
-high_grade_server_pcb
-mobile_phone_pcb
 lead_acid_battery
 li_ion_cells
 cardboard_carton
