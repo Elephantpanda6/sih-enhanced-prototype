@@ -1,0 +1,30 @@
+{
+  "primary_offline_vlm": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "quantization": "int4_awq",
+  "supports_offline_24x7": true,
+  "supported_scrap_categories": [
+    "e_waste_pcb_high",
+    "e_waste_smartphone",
+    "copper_bare_bright",
+    "copper_armature",
+    "brass_honey",
+    "aluminium_extrusions",
+    "iron_hms_heavy",
+    "light_iron_patra",
+    "battery_lead_acid",
+    "battery_li_ion",
+    "cardboard_carton",
+    "pet_plastic"
+  ],
+  "cpcb_hazard_guidelines_embedded": true,
+  "multilingual_safety_prompts": {
+    "hi": "\u0915\u092c\u093e\u0921\u093c \u0914\u0930 \u0908-\u0915\u091a\u0930\u0947 \u0915\u0940 \u092a\u0939\u091a\u093e\u0928 \u0915\u0930\u0947\u0902 \u0914\u0930 \u0938\u0940\u092a\u0940\u0938\u0940\u092c\u0940 \u0938\u0941\u0930\u0915\u094d\u0937\u093e \u091a\u0947\u0924\u093e\u0935\u0928\u0940 \u0926\u0947\u0902\u0964",
+    "mr": "\u092d\u0902\u0917\u093e\u0930 \u0906\u0923\u093f \u0908-\u0915\u091a\u0930\u093e \u0913\u0933\u0916\u0942\u0928 \u0938\u0940\u092a\u0940\u0938\u0940\u092c\u0940 \u0938\u0941\u0930\u0915\u094d\u0937\u093e \u0928\u093f\u092f\u092e \u0926\u094d\u092f\u093e."
+  },
+  "device_targets": [
+    "Android_NPU",
+    "Android_CPU",
+    "Server_CUDA",
+    "Edge_CPU"
+  ]
+}

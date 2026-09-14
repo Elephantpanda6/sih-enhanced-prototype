@@ -312,6 +312,7 @@ class VoiceEngine(private val context: Context) : TextToSpeech.OnInitListener {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, currentLanguage.code)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
             val promptMsg = when (currentLanguage) {
                 AppLanguage.MARATHI -> "भंगाराचे नाव आणि वजन सांगा..."
                 AppLanguage.HINDI -> "कबाड़ का नाम और वजन बताएं..."

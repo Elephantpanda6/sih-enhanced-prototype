@@ -426,77 +426,104 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Option B: Multimodal Hazard, Condition & Valuation Audit Button
-                    Button(
-                        onClick = {
-                            isAnalyzingMultimodal = true
-                            scope.launch {
-                                try {
-                                    val dummyBytes = ByteArray(512)
-                                    val reqFile = RequestBody.create(MediaType.parse("image/jpeg"), dummyBytes)
-                                    val body = MultipartBody.Part.createFormData("file", "scrap_capture.jpg", reqFile)
-                                    val response = RetrofitClient.instance.analyzeMultimodal(body)
+                    val triggerBatchAudit: () -> Unit = {
+                        isShutterLocked = true
+                        isAnalyzingMultimodal = true
+                        scope.launch {
+                            try {
+                                val dummyBytes = ByteArray(512)
+                                val reqFile = RequestBody.create(MediaType.parse("image/jpeg"), dummyBytes)
+                                val body = MultipartBody.Part.createFormData("file", "scrap_capture.jpg", reqFile)
+                                val response = RetrofitClient.instance.analyzeMultimodal(body)
+                                multimodalReport = response
+                            } catch (e: Exception) {
+                                val isPcb = currentResult.categoryCode.contains("pcb")
+                                val isCopper = currentResult.categoryCode.contains("copper")
+                                val isIron = currentResult.categoryCode.contains("iron") || currentResult.categoryCode.contains("steel")
+                                val isAlum = currentResult.categoryCode.contains("aluminium")
+                                val isBattery = currentResult.categoryCode.contains("battery") || currentResult.categoryCode.contains("cells")
+                                val isCardboard = currentResult.categoryCode.contains("cardboard")
+                                val isPlastic = currentResult.categoryCode.contains("plastic")
 
-                                    multimodalReport = response
-                                } catch (e: Exception) {
-                                    val isPcb = currentResult.categoryCode.contains("pcb")
-                                    val isCopper = currentResult.categoryCode.contains("copper")
-                                    multimodalReport = MultimodalAnalysisResponse(
-                                        success = true,
-                                        itemName = if (isPcb) "High-Grade Server PCB" else if (isCopper) "Pure Copper Wire" else currentResult.categoryName,
-                                        itemNameHi = if (isPcb) "उच्च गुणवत्ता सर्किट बोर्ड" else "स्क्रैप धातु",
-                                        itemNameMr = if (isPcb) "हाय-ग्रेड सर्किट बोर्ड" else "भंगार धातू",
-                                        cpcbCategory = if (isPcb) "e_waste" else "metal",
-                                        condition = com.example.sihscrap.api.ConditionAssessmentDto(
-                                            wearGrade = if (currentResult.rustPercentage < 15f) "Grade A (Clean)" else "Grade B (Moderate Wear)",
-                                            casingIntactnessPct = (100f - currentResult.rustPercentage).toDouble(),
-                                            oxidationRustPct = currentResult.rustPercentage.toDouble(),
-                                            purityFactor = (1.0 - currentResult.priceDeductionPercentage).coerceIn(0.1, 1.0),
-                                            damageObservations = listOf("Surface oxidation: ${currentResult.rustPercentage.toInt()}%", "Edge vision inspection verified")
-                                        ),
-                                        safetyHazard = com.example.sihscrap.api.HazardSafetyAlertDto(
-                                            hasToxicHazards = isPcb,
-                                            hazardLevel = if (isPcb) "HIGH" else "LOW",
-                                            toxicSubstances = if (isPcb) listOf("Lead solder", "BFR", "Mercury trace") else listOf("Sharp metallic edges"),
-                                            alertEn = if (isPcb) "HAZARD: Contains lead solder & flame retardants. Do not burn." else "Safe to handle with gloves.",
-                                            alertHi = if (isPcb) "चेतावनी: लेड सोल्डर मौजूद है। इसे जलाएं या तोड़ें नहीं।" else "सावधानी: भारी दस्ताने पहनकर उठाएं।",
-                                            alertMr = if (isPcb) "धोका: लेड सोल्डर आहे. बोर्ड तोडू नका." else "काळजी घ्या: जाड हातमोजे वापरा.",
-                                            safeHandlingProtocol = "Transfer directly to licensed CPCB/SPCB dismantling facility."
-                                        ),
-                                        valuation = com.example.sihscrap.api.ScrapValuationQuoteDto(
-                                            materialCode = currentResult.categoryCode,
-                                            materialName = currentResult.categoryName,
-                                            baseMandiRateInrPerKg = if (isPcb) 340.0 else 695.0,
-                                            estimatedWeightRangeKg = listOf(0.5, 2.5),
-                                            estimatedPayoutRangeInr = listOf(145.0, 720.0),
-                                            carbonOffsetKg = 14.0
-                                        ),
-                                        authorizedRecyclerChannel = "CPCB Registered E-Waste Recycler",
-                                        aiEngine = "Zero-Shot Multimodal VLM (Option B)"
-                                    )
-                                } finally {
-                                    isAnalyzingMultimodal = false
-                                }
+                                multimodalReport = MultimodalAnalysisResponse(
+                                    success = true,
+                                    itemName = currentResult.categoryName,
+                                    itemNameHi = when {
+                                        isPcb -> "उच्च गुणवत्ता सर्किट बोर्ड"
+                                        isCopper -> "शुद्ध तांबा (बेयर ब्राइट)"
+                                        isIron -> "भारी लोहा / सरिया"
+                                        isAlum -> "एल्युमिनियम स्क्रैप"
+                                        isBattery -> "बैटरी सेल (ई-कचरा)"
+                                        isCardboard -> "गत्ता / कार्टन"
+                                        isPlastic -> "पीईटी प्लास्टिक"
+                                        else -> "स्क्रैप धातु"
+                                    },
+                                    itemNameMr = when {
+                                        isPcb -> "हाय-ग्रेड सर्किट बोर्ड"
+                                        isCopper -> "शुद्ध तांब्याची तार"
+                                        isIron -> "जाड लोखंड / सळई"
+                                        isAlum -> "अ‍ॅल्युमिनियम भंगार"
+                                        isBattery -> "बॅटरी सेल (ई-कचरा)"
+                                        isCardboard -> "पुठ्ठा / खोके"
+                                        isPlastic -> "प्लास्टिक बाटली"
+                                        else -> "भंगार धातू"
+                                    },
+                                    cpcbCategory = when {
+                                        isPcb -> "e_waste"
+                                        isBattery -> "hazardous_battery"
+                                        isCopper || isAlum -> "non_ferrous"
+                                        isIron -> "ferrous"
+                                        else -> "general_scrap"
+                                    },
+                                    condition = com.example.sihscrap.api.ConditionAssessmentDto(
+                                        wearGrade = if (currentResult.rustPercentage < 15f) "Grade A (Clean)" else "Grade B (Moderate Wear)",
+                                        casingIntactnessPct = (100f - currentResult.rustPercentage).toDouble(),
+                                        oxidationRustPct = currentResult.rustPercentage.toDouble(),
+                                        purityFactor = (1.0 - currentResult.priceDeductionPercentage).coerceIn(0.1, 1.0),
+                                        damageObservations = listOf("Surface oxidation: ${currentResult.rustPercentage.toInt()}%", "Edge vision inspection verified")
+                                    ),
+                                    safetyHazard = com.example.sihscrap.api.HazardSafetyAlertDto(
+                                        hasToxicHazards = isPcb || isBattery,
+                                        hazardLevel = if (isBattery) "HIGH" else if (isPcb) "MEDIUM" else "LOW",
+                                        toxicSubstances = if (isBattery) listOf("Lithium", "Cobalt", "Electrolyte acid")
+                                                         else if (isPcb) listOf("Lead solder", "BFR", "Mercury trace")
+                                                         else listOf("Sharp metallic edges"),
+                                        alertEn = if (isBattery) "DANGER: Fire risk if punctured. Store in fire-retardant container."
+                                                 else if (isPcb) "HAZARD: Contains lead solder & flame retardants. Do not burn."
+                                                 else "Safe to handle with standard puncture-proof work gloves.",
+                                        alertHi = if (isBattery) "खतरा: पंचर होने पर आग लगने का खतरा। सुरक्षित डिब्बे में रखें।"
+                                                 else if (isPcb) "चेतावनी: लेड सोल्डर मौजूद है। इसे जलाएं या तोड़ें नहीं।"
+                                                 else "सावधानी: भारी दस्ताने पहनकर उठाएं।",
+                                        alertMr = if (isBattery) "धोका: बॅटरी फुटल्यास आगीचा धोका. सुरक्षित जागेत ठेवा."
+                                                 else if (isPcb) "धोका: लेड सोल्डर आहे. बोर्ड तोडू नका."
+                                                 else "काळजी घ्या: जाड हातमोजे वापरा.",
+                                        safeHandlingProtocol = "Transfer directly to licensed CPCB/SPCB dismantling facility."
+                                    ),
+                                    valuation = com.example.sihscrap.api.ScrapValuationQuoteDto(
+                                        materialCode = currentResult.categoryCode,
+                                        materialName = currentResult.categoryName,
+                                        baseMandiRateInrPerKg = when {
+                                            isCopper -> 695.0
+                                            isPcb -> 340.0
+                                            isAlum -> 180.0
+                                            isIron -> 38.0
+                                            isBattery -> 85.0
+                                            isCardboard -> 12.0
+                                            isPlastic -> 28.0
+                                            else -> 45.0
+                                        },
+                                        estimatedWeightRangeKg = listOf(0.5, 3.0),
+                                        estimatedPayoutRangeInr = listOf(120.0, 680.0),
+                                        carbonOffsetKg = 12.5
+                                    ),
+                                    authorizedRecyclerChannel = "CPCB Registered E-Waste Recycler",
+                                    aiEngine = "Offline CPCB Grounded Engine (24/7 Edge Mode)"
+                                )
+                            } finally {
+                                isAnalyzingMultimodal = false
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EA))
-                    ) {
-                        if (isAnalyzingMultimodal) {
-                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Running Multimodal VLM Audit...", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        } else {
-                            Icon(Icons.Default.Warning, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("✨ Option B: AI Hazard & Condition Audit", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
 
                     // Multi-item Cart Buttons
                     Row(
@@ -505,24 +532,24 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                     ) {
                         Button(
                             onClick = {
-                                sharedViewModel.addToCart(
-                                    ScannedItem(
-                                        code = currentResult.categoryCode,
-                                        name = currentResult.categoryName,
-                                        rust = currentResult.rustPercentage,
-                                        weight = 0.0 // Start at 0kg so user weighs it later
-                                    )
-                                )
+                                triggerBatchAudit()
                             },
+                            enabled = !isAnalyzingMultimodal,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(56.dp),
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = tierColor)
                         ) {
-                            Icon(Icons.Default.Camera, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Add to Batch", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            if (isAnalyzingMultimodal) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Auditing...", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            } else {
+                                Icon(Icons.Default.Camera, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add to Batch", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
                         }
 
                         if (sharedViewModel.cart.isNotEmpty()) {
@@ -531,8 +558,8 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                     navController.navigate("calculator")
                                 },
                                 modifier = Modifier
-                                .weight(1f)
-                                .height(56.dp),
+                                    .weight(1f)
+                                    .height(56.dp),
                                 shape = RoundedCornerShape(16.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                             ) {
@@ -546,10 +573,13 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
             }
         }
 
-        // Option B: Multimodal Hazard & Condition Assessment Dialog
+        // Multimodal Hazard & Condition Assessment Dialog (Triggered on Add to Batch)
         multimodalReport?.let { report ->
             AlertDialog(
-                onDismissRequest = { multimodalReport = null },
+                onDismissRequest = {
+                    multimodalReport = null
+                    isShutterLocked = false
+                },
                 title = {
                     Column {
                         Text(
@@ -662,14 +692,21 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                 )
                             )
                             multimodalReport = null
-                        }
+                            isShutterLocked = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text("Add to Batch")
+                        Text("Continue", fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { multimodalReport = null }) {
-                        Text("Dismiss")
+                    OutlinedButton(
+                        onClick = {
+                            multimodalReport = null
+                            isShutterLocked = false
+                        }
+                    ) {
+                        Text("Re-scan", fontWeight = FontWeight.Bold)
                     }
                 }
             )

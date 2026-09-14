@@ -45,12 +45,30 @@ class ThrottledImageAnalyzer(
 
     private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
-            val bitmap = imageProxy.toBitmap()
-            // Scale down to YOLO input size (224x224)
-            Bitmap.createScaledBitmap(bitmap, 224, 224, false)
+            imageProxy.toBitmap()?.let {
+                Bitmap.createScaledBitmap(it, 224, 224, false)
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to convert ImageProxy to Bitmap: ${e.message}")
-            null
+            try {
+                // High-performance fallback for direct buffer reading
+                val planes = imageProxy.planes
+                if (planes.isNotEmpty()) {
+                    val buffer = planes[0].buffer
+                    val pixelStride = planes[0].pixelStride
+                    val rowStride = planes[0].rowStride
+                    val rowPadding = rowStride - pixelStride * imageProxy.width
+                    val bitmap = Bitmap.createBitmap(
+                        imageProxy.width + rowPadding / pixelStride,
+                        imageProxy.height,
+                        Bitmap.Config.ARGB_8888
+                    )
+                    bitmap.copyPixelsFromBuffer(buffer)
+                    Bitmap.createScaledBitmap(bitmap, 224, 224, false)
+                } else null
+            } catch (fallbackEx: Exception) {
+                Log.e(TAG, "Failed to convert ImageProxy to Bitmap: ${e.message}")
+                null
+            }
         }
     }
 
