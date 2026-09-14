@@ -45,9 +45,8 @@ class ThrottledImageAnalyzer(
 
     private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
-            imageProxy.toBitmap()?.let {
-                Bitmap.createScaledBitmap(it, 224, 224, true)
-            }
+            val bmp = imageProxy.toBitmap()
+            Bitmap.createScaledBitmap(bmp, 224, 224, true)
         } catch (e: Exception) {
             try {
                 // High-performance fallback for direct buffer reading
