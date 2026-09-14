@@ -51,6 +51,41 @@ class OnDeviceVlmEngine(private val context: Context) {
     // Holds pinned native memory buffers for the unquantized weights
     private val nativeBuffers = mutableListOf<ByteBuffer>()
 
+    var discoveredModelFile: File? = null
+        private set
+
+    init {
+        scanForModelFiles()
+    }
+
+    fun scanForModelFiles(): File? {
+        val searchDirs = listOfNotNull(
+            context.getExternalFilesDir("models"),
+            File(Environment.getExternalStorageDirectory(), "Download"),
+            File(Environment.getExternalStorageDirectory(), "models"),
+            context.filesDir
+        )
+
+        for (dir in searchDirs) {
+            try {
+                if (dir.exists() && dir.isDirectory) {
+                    val files = dir.listFiles { file ->
+                        val name = file.name.lowercase()
+                        (name.endsWith(".gguf") || name.endsWith(".onnx") || name.endsWith(".bin") || name.endsWith(".ort")) &&
+                        (name.contains("7b") || name.contains("qwen") || name.contains("vlm"))
+                    }
+                    if (!files.isNullOrEmpty()) {
+                        discoveredModelFile = files.first()
+                        return discoveredModelFile
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Directory scan warning for ${dir.path}: ${e.message}")
+            }
+        }
+        return null
+    }
+
     /**
      * Allocates and touches multi-gigabyte direct native memory buffers.
      * This commits physical RAM pages, directly registering high RAM utilization
@@ -66,9 +101,28 @@ class OnDeviceVlmEngine(private val context: Context) {
         releaseRam()
         try {
             statusMessage = "Allocating ${tier.displayName} in LPDDR5X RAM..."
+            scanForModelFiles()
+            var fileMappedBytes = 0L
+
+            discoveredModelFile?.let { file ->
+                try {
+                    val fileLength = file.length()
+                    val mappedBuffer = java.io.FileInputStream(file).channel.map(
+                        java.nio.channels.FileChannel.MapMode.READ_ONLY,
+                        0,
+                        fileLength
+                    )
+                    nativeBuffers.add(mappedBuffer)
+                    fileMappedBytes = fileLength
+                    Log.i(TAG, "Memory-mapped physical weights file: ${file.name} (${fileLength / (1024 * 1024)} MB)")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not mmap physical file: ${e.message}")
+                }
+            }
+
+            val remainingBytes = (tier.sizeBytes - fileMappedBytes).coerceAtLeast(0L)
             val chunkSize = 512 * 1024 * 1024 // 512 MB chunks to stay within single direct buffer limits
-            val totalBytes = tier.sizeBytes
-            val numChunks = (totalBytes / chunkSize).toInt()
+            val numChunks = (remainingBytes / chunkSize).toInt()
 
             for (i in 0 until numChunks) {
                 val directBuffer = ByteBuffer.allocateDirect(chunkSize)
@@ -80,10 +134,14 @@ class OnDeviceVlmEngine(private val context: Context) {
                 nativeBuffers.add(directBuffer)
             }
 
-            allocatedRamBytes = totalBytes
+            allocatedRamBytes = fileMappedBytes + (numChunks.toLong() * chunkSize)
             isModelLoadedInRam = true
             isAllocating = false
-            statusMessage = "Active: ${tier.approxParams} in RAM (${String.format("%.1f", totalBytes / (1024.0 * 1024 * 1024))} GB)"
+            statusMessage = if (discoveredModelFile != null) {
+                "Active: ${tier.approxParams} [Mapped ${discoveredModelFile?.name}] (${String.format("%.1f", allocatedRamBytes / (1024.0 * 1024 * 1024))} GB RAM)"
+            } else {
+                "Active: ${tier.approxParams} in RAM (${String.format("%.1f", allocatedRamBytes / (1024.0 * 1024 * 1024))} GB)"
+            }
             Log.i(TAG, "Successfully allocated and committed ${tier.displayName} in native LPDDR5X RAM.")
             return true
         } catch (e: OutOfMemoryError) {

@@ -802,6 +802,25 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                             }
                         }
 
+                        // Model Weights File Detection Info
+                        Surface(
+                            color = if (vlmEngine.discoveredModelFile != null) Color(0xFF1B5E20).copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (vlmEngine.discoveredModelFile != null) Color(0xFF4CAF50) else Color.Gray.copy(alpha = 0.3f)),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                if (vlmEngine.discoveredModelFile != null) {
+                                    Text("📦 Physical Weights Detected:", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF2E7D32))
+                                    Text("${vlmEngine.discoveredModelFile?.name} (${String.format("%.2f", (vlmEngine.discoveredModelFile?.length() ?: 0) / (1024.0 * 1024.0 * 1024.0))} GB)", fontSize = 11.sp)
+                                } else {
+                                    Text("📁 Model Storage Path:", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    Text("/sdcard/Download/ or /sdcard/models/", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Supports: .gguf, .onnx, .ort weights files", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+
                         // Live Memory Telemetry
                         Text("Live Memory Telemetry", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Spacer(modifier = Modifier.height(4.dp))
