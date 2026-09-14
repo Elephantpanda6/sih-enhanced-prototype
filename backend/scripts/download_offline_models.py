@@ -26,11 +26,12 @@ VOSK_DIR = MODELS_DIR / "vosk"
 
 # Verified lightweight models suitable for mobile edge & local PC inference
 MODEL_REGISTRY = {
-    "qwen2.5-vl-3b-fp16": {
-        "description": "Qwen2.5-VL 3B Instruct Full-Precision FP16 Vision-Language Model (Unquantized, Max Accuracy)",
-        "hf_repo": "Qwen/Qwen2.5-VL-3B-Instruct",
+    "qwen2.5-vl-7b-fp16": {
+        "description": "Qwen2.5-VL 7B Instruct Full-Precision FP16 Vision-Language Model (7-Billion Parameters, Unquantized Max Precision)",
+        "hf_repo": "Qwen/Qwen2.5-VL-7B-Instruct",
         "precision": "float16",
-        "size_mb": 6200,
+        "parameters": "7B",
+        "size_mb": 14500,
         "type": "vlm"
     },
     "mobilenetv3-scrap-onnx": {
@@ -85,13 +86,18 @@ def download_file_with_progress(url: str, dest_path: Path):
 
 
 def setup_offline_vlm_config():
-    """Generates unquantized edge runtime configuration for Qwen2.5-VL / MobileVLM with maximum accuracy."""
+    """Generates unquantized edge runtime configuration for Qwen2.5-VL-7B (7-Billion parameters) with maximum precision."""
     config_file = OFFLINE_VLM_DIR / "vlm_runtime_config.json"
     config = {
-        "primary_offline_vlm": "Qwen/Qwen2.5-VL-3B-Instruct",
+        "primary_offline_vlm": "Qwen/Qwen2.5-VL-7B-Instruct",
+        "parameters": "7 Billion",
         "quantization": "none",
         "precision": "float16_full_accuracy",
-        "quantization_disabled_reason": "Prioritizing classification accuracy and bounding box precision with 8GB VRAM / 24GB Mobile RAM headroom",
+        "quantization_disabled_reason": "7-Billion parameter multimodal architecture deployed for uncompromised precision without rounding loss",
+        "target_hardware": {
+            "mobile": "RedMagic 11 Pro (24 GB RAM, Snapdragon 8 Elite) -> Native Unified Memory (~14.5 GB footprint)",
+            "host_gpu": "NVIDIA GeForce RTX 4060 (8 GB VRAM) -> Hybrid CUDA/CPU Offload"
+        },
         "supports_offline_24x7": True,
         "supported_scrap_categories": [
             "ewaste_computer_mouse", "ewaste_smartphone", "ewaste_laptop",
@@ -112,7 +118,7 @@ def setup_offline_vlm_config():
     }
     with open(config_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
-    logger.info(f"Generated unquantized offline VLM configuration at: {config_file}")
+    logger.info(f"Generated 7B offline VLM configuration at: {config_file}")
 
 
 def check_local_model_status():

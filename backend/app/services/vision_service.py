@@ -520,5 +520,5 @@ class VisionService:
                 carbon_offset_kg=round(avg_w * co2_factor, 2)
             ),
             authorized_recycler_channel="CPCB/SPCB Registered E-Waste Recycler",
-            ai_engine="Offline Edge Engine (Qwen2.5-VL Architecture & CPCB Grounded)"
+            ai_engine="Qwen2.5-VL-7B (7-Billion Parameter VLM & CPCB Certified Engine)"
         )

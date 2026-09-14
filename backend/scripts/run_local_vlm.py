@@ -62,41 +62,55 @@ def check_compute_environment():
     logger.info("============================================================\n")
 
 
-def run_qwen_vl_3b_fp16(image_path: Path, prompt_lang: str = "en"):
+def run_qwen_vl_7b_fp16(image_path: Path, prompt_lang: str = "en", model_id: str = "Qwen/Qwen2.5-VL-7B-Instruct"):
     """
-    Executes unquantized Qwen2.5-VL-3B-Instruct in full FP16 precision on NVIDIA RTX 4060.
-    Requires: pip install transformers accelerate
+    Executes unquantized 7-Billion parameter Qwen2.5-VL-7B-Instruct in full FP16 precision.
+    - On RedMagic 11 Pro (24 GB RAM): Runs natively in unified memory (~14.5 GB footprint).
+    - On RTX 4060 Laptop (8 GB VRAM): Splits layers seamlessly across GPU and Host CPU RAM using device_map='auto'.
     """
     try:
         import torch
         from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
         from PIL import Image
     except ImportError:
-        logger.error("Required libraries missing for direct VLM execution.")
+        logger.error("Required libraries missing for 7B VLM execution.")
         logger.info("Install with: pip install transformers accelerate torchvision")
         return None
 
-    if not torch.cuda.is_available():
-        logger.error("CUDA GPU not available. Running an unquantized 3B transformer on CPU will exceed latency targets.")
-        return None
-
-    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
-    logger.info(f"Loading unquantized full-precision {model_id} onto RTX 4060 GPU (torch_dtype=torch.float16)...")
+    logger.info(f"Loading 7-Billion Parameter VLM ({model_id}) in unquantized FP16 precision...")
+    if torch.cuda.is_available():
+        logger.info("Configuring hybrid CUDA/CPU memory partition (6.5GB VRAM ceiling, CPU offload for remaining 7B layers)...")
+        max_memory = {0: "6.5GB", "cpu": "24GB"}
+    else:
+        max_memory = None
 
     try:
         model = Qwen2VLForConditionalGeneration.from_pretrained(
             model_id,
             torch_dtype=torch.float16,
-            device_map="auto"
+            device_map="auto",
+            max_memory=max_memory,
+            offload_folder=str(MODEL_CACHE_DIR / "offload")
         )
         processor = AutoProcessor.from_pretrained(model_id)
 
         image = Image.open(image_path).convert("RGB")
 
-        prompt_text = (
-            "Analyze this e-waste scrap image as a CPCB inspector. "
-            "Identify: item name, wear grade, CPCB schedule category, hazardous components, and metal recovery tips."
-        )
+        lang_prompts = {
+            "en": (
+                "You are a CPCB E-Waste & Scrap Computer Vision Auditor. Analyze this scrap/electronic appliance image. "
+                "Output JSON with: item_name, cpcb_category, wear_grade, intactness_pct, oxidation_rust_pct, "
+                "toxic_hazards, safety_alert, estimated_weight_kg, mandi_price_per_kg."
+            ),
+            "hi": (
+                "आप सीपीसीबी ई-कचरा ऑडिटर हैं। इस उपकरण की स्थिति, वजन, जंग का प्रतिशत, विषाक्त खतरे और मंडी मूल्य बताएं।"
+            ),
+            "mr": (
+                "तुम्ही सीपीसीबी ई-कचरा ऑडिटर आहात. या उपकरणाची स्थिती, वजन, गंज टक्केवारी, विषारी धोके आणि बाजार भाव सांगा."
+            )
+        }
+
+        prompt_text = lang_prompts.get(prompt_lang, lang_prompts["en"])
 
         messages = [
             {
@@ -109,30 +123,33 @@ def run_qwen_vl_3b_fp16(image_path: Path, prompt_lang: str = "en"):
         ]
 
         text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = processor(text=[text], images=[image], padding=True, return_tensors="pt").to("cuda")
+        inputs = processor(text=[text], images=[image], padding=True, return_tensors="pt")
+        if torch.cuda.is_available():
+            inputs = inputs.to("cuda")
 
-        logger.info("Generating deep unquantized multimodal audit tokens...")
+        logger.info("Generating 7B parameter deep multimodal audit tokens...")
         with torch.no_grad():
-            generated_ids = model.generate(**inputs, max_new_tokens=256)
+            generated_ids = model.generate(**inputs, max_new_tokens=300)
         
         trimmed_ids = [out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
         output_text = processor.batch_decode(trimmed_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 
-        logger.info("Audit Complete!")
-        print("\n=== VLM Audit Report (Unquantized Qwen2.5-VL-3B FP16) ===")
+        logger.info("7B VLM Deep Audit Complete!")
+        print("\n=== 7B VLM Audit Report (Unquantized Qwen2.5-VL-7B FP16) ===")
         print(output_text)
-        print("=========================================================\n")
+        print("============================================================\n")
         return output_text
 
     except Exception as e:
-        logger.error(f"VLM execution encountered error: {e}")
+        logger.error(f"7B VLM execution error: {e}")
         return None
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run unquantized n-Billion parameter models on RTX 4060 and RedMagic 11 Pro")
-    parser.add_argument("--audit", action="store_true", help="Audit hardware memory headroom for 3B/7B models")
-    parser.add_argument("--image", type=str, help="Path to scrap image for unquantized VLM inspection")
+    parser = argparse.ArgumentParser(description="Run 7-Billion Parameter VLM for max precision scrap analysis")
+    parser.add_argument("--audit", action="store_true", help="Audit hardware memory headroom for 7B models")
+    parser.add_argument("--image", type=str, help="Path to scrap image for 7B VLM inspection")
+    parser.add_argument("--model", type=str, default="Qwen/Qwen2.5-VL-7B-Instruct", help="HuggingFace model ID (default: 7B VLM)")
     parser.add_argument("--lang", type=str, default="en", choices=["en", "hi", "mr"], help="Inspection language")
     args = parser.parse_args()
 
@@ -141,7 +158,7 @@ def main():
     if args.image:
         img_path = Path(args.image)
         if img_path.exists():
-            run_qwen_vl_3b_fp16(img_path, args.lang)
+            run_qwen_vl_7b_fp16(img_path, prompt_lang=args.lang, model_id=args.model)
         else:
             logger.error(f"Image not found: {img_path}")
 

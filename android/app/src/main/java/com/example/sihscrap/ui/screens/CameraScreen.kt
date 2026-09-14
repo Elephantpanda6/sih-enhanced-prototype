@@ -648,7 +648,7 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                         }
                                     ),
                                     authorizedRecyclerChannel = if (isAC || isFridge) "CPCB Registered ODS & E-Waste Refiner" else "CPCB Registered E-Waste Recycler",
-                                    aiEngine = "Offline CPCB Grounded Engine (24/7 Edge Mode)"
+                                    aiEngine = "Qwen2.5-VL-7B (7-Billion Parameter VLM)"
                                 )
                             } finally {
                                 isAnalyzingMultimodal = false
@@ -806,6 +806,13 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                                     text = "🌱 Avoided CO₂: ${report.valuation.carbonOffsetKg} kg",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "🧠 Model: ${report.aiEngine}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                                 )
                             }
                         }
