@@ -1,5 +1,6 @@
 package com.example.sihscrap.ui.screens
 
+import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -431,9 +432,12 @@ fun CameraScreen(navController: NavController, sharedViewModel: SharedViewModel)
                         isAnalyzingMultimodal = true
                         scope.launch {
                             try {
-                                val dummyBytes = ByteArray(512)
-                                val reqFile = RequestBody.create(MediaType.parse("image/jpeg"), dummyBytes)
-                                val body = MultipartBody.Part.createFormData("file", "scrap_capture.jpg", reqFile)
+                                val currentBmp = previewViewRef?.bitmap ?: Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888)
+                                val stream = java.io.ByteArrayOutputStream()
+                                currentBmp.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                                val realImageBytes = stream.toByteArray()
+                                val reqFile = RequestBody.create(MediaType.parse("image/jpeg"), realImageBytes)
+                                val body = MultipartBody.Part.createFormData("file", "${currentResult.categoryCode}.jpg", reqFile)
                                 val response = RetrofitClient.instance.analyzeMultimodal(body)
                                 multimodalReport = response
                             } catch (e: Exception) {

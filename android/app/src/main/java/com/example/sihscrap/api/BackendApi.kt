@@ -172,19 +172,23 @@ interface BackendApi {
 
 
 object RetrofitClient {
-    private var baseUrl = "http://10.0.2.2:8000"
+    private var baseUrl = "http://192.168.88.8:8000"
 
     fun setBaseUrl(url: String) {
-        baseUrl = url
+        baseUrl = if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            "http://$url"
+        } else {
+            url
+        }
         _instance = null
     }
 
     fun getBaseUrl(): String = baseUrl
 
     private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
-        .writeTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(45, TimeUnit.SECONDS)
+        .writeTimeout(45, TimeUnit.SECONDS)
         .build()
 
     private var _instance: BackendApi? = null
