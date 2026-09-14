@@ -1,0 +1,15 @@
+copper_bare_bright
+copper_armature
+brass_honey
+aluminium_extrusions
+aluminium_castings
+aluminium_utensils
+heavy_steel_sariya
+light_iron_patra
+cast_iron
+high_grade_server_pcb
+mobile_phone_pcb
+lead_acid_battery
+li_ion_cells
+cardboard_carton
+pet_plastic

@@ -1,0 +1,17 @@
+﻿{
+  "version": 8,
+  "name": "Offline Base",
+  "metadata": {},
+  "sources": {},
+  "sprite": "",
+  "glyphs": "",
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#EAEAEA"
+      }
+    }
+  ]
+}

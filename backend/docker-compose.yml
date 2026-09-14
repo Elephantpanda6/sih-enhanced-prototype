@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  sih-scrap-backend:
+    build: .
+    container_name: sih_scrap_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - LOG_LEVEL=INFO
+      - SECRET_KEY=sih2026-cpcb-enterprise-scrap-auth-token-998877
+    restart: unless-stopped
