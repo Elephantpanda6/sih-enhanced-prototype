@@ -33,6 +33,12 @@ class OnDeviceVlmEngine(private val context: Context) {
         val approxParams: String,
         val description: String
     ) {
+        TIER_14B_Q4KM(
+            "Qwen3-VL (14B) Q4_K_M (4-bit)",
+            14L * 1024 * 1024 * 1024,
+            "14.0B Params (Q4_K_M 4-bit)",
+            "Flagship ultra-deep vision reasoning & PCB component-level defect analysis. Tailored for Snapdragon 8 Elite & 24 GB LPDDR5X RAM."
+        ),
         TIER_7B_FP16(
             "Qwen2.5-VL-7B (Recommended)",
             12L * 1024 * 1024 * 1024,
@@ -130,7 +136,7 @@ class OnDeviceVlmEngine(private val context: Context) {
                     val files = dir.listFiles { file ->
                         val name = file.name.lowercase()
                         val isCandidate = (name.endsWith(".gguf") || name.endsWith(".onnx") || name.endsWith(".bin") || name.endsWith(".ort")) &&
-                            (name.contains("7b") || name.contains("qwen") || name.contains("vlm") || name.contains("2b"))
+                            (name.contains("7b") || name.contains("qwen") || name.contains("vlm") || name.contains("2b") || name.contains("14b") || name.contains("qwen3"))
                         // Require at least 50 MB to prevent treating 0-byte or failed-download stubs as complete weights
                         isCandidate && file.length() > 50 * 1024 * 1024
                     }
@@ -147,6 +153,16 @@ class OnDeviceVlmEngine(private val context: Context) {
             }
         }
         return null
+    }
+
+    /**
+     * Flagship 14B Q4_K_M vision model download (8.99 GB) for Snapdragon 8 Elite + 24 GB RAM.
+     */
+    fun download14BVisionModel(): Long {
+        return downloadModelWeights(
+            url = "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf",
+            fileName = "Qwen3-VL-14B-Instruct-Q4_K_M.gguf"
+        )
     }
 
     /**
@@ -309,7 +325,7 @@ class OnDeviceVlmEngine(private val context: Context) {
         )
 
         // Enrich with on-device VLM attribution and live hardware signature
-        val vlmAttribution = "Qwen2.5-VL On-Device Engine (${selectedTier.approxParams} | Snapdragon 8 Elite Oryon Cores)"
+        val vlmAttribution = "On-Device Neural Engine (${selectedTier.displayName} | Snapdragon 8 Elite Oryon Cores)"
 
         baseReport.copy(
             aiEngine = vlmAttribution

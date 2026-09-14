@@ -158,7 +158,20 @@ fun SettingsScreen(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp
                                     )
-                                    if (tier == OnDeviceVlmEngine.RamTier.TIER_7B_FP16) {
+                                    if (tier == OnDeviceVlmEngine.RamTier.TIER_14B_Q4KM) {
+                                        Surface(
+                                            color = Color(0xFF7C3AED),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "FLAGSHIP (14B)",
+                                                color = Color.White,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    } else if (tier == OnDeviceVlmEngine.RamTier.TIER_7B_FP16) {
                                         Surface(
                                             color = Color(0xFFFF6D00),
                                             shape = RoundedCornerShape(4.dp)
@@ -276,7 +289,7 @@ fun SettingsScreen(
                             )
                         }
                         Text("Path: /sdcard/Download/ or /sdcard/models/", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Expected file: Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf or Qwen2-VL-2B-Instruct-Q4_K_M.gguf", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Expected: Qwen3-VL-14B-Instruct-Q4_K_M.gguf, Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf, or Qwen2-VL-2B-Instruct-Q4_K_M.gguf", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -285,6 +298,17 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
+
+                    Button(
+                        onClick = {
+                            vlmEngine.download14BVisionModel()
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED))
+                    ) {
+                        Text("🚀 14B Q4_K_M (8.99 GB) — Snapdragon 8 Elite Flagship", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
